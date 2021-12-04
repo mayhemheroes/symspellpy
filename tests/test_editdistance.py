@@ -12,6 +12,7 @@ from symspellpy.editdistance import (
     EditDistance,
     Levenshtein,
     LevenshteinFast,
+    Ukkonen,
 )
 
 SHORT_STRING = "string"
@@ -66,20 +67,29 @@ def expected_damerau_osa(string_1, string_2, max_distance):
 
 
 @pytest.fixture(
-    params=["damerau_osa", "levenshtein", "damerau_osa_fast", "levenshtein_fast"]
+    params=[
+        "levenshtein",
+        "levenshtein_fast",
+        "damerau_osa",
+        "damerau_osa_fast",
+        "ukkonen",
+    ]
 )
 def get_comparer(request):
     comparer_dict = {
-        "damerau_osa": {"actual": DamerauOsa(), "expected": expected_damerau_osa},
         "levenshtein": {"actual": Levenshtein(), "expected": expected_levenshtein},
-        "damerau_osa_fast": {
-            "actual": DamerauOsaFast(),
-            "expected": expected_damerau_osa,
-        },
         "levenshtein_fast": {
             "actual": LevenshteinFast(),
             "expected": expected_levenshtein,
         },
+        "damerau_osa": {"actual": DamerauOsa(), "expected": expected_damerau_osa},
+        "damerau_osa_fast": {
+            "actual": DamerauOsaFast(),
+            "expected": expected_damerau_osa,
+        },
+        # ukkonen is expected to give the same result as levenshtein according
+        # the original repo
+        "ukkonen": {"actual": Ukkonen(), "expected": expected_levenshtein},
     }
     yield comparer_dict[request.param]["actual"], comparer_dict[request.param][
         "expected"
@@ -91,21 +101,25 @@ def get_comparer(request):
 )
 def get_edit_distance(request):
     comparer_dict = {
-        "damerau_osa": {
-            "actual": EditDistance(DistanceAlgorithm.DAMERAU_OSA),
-            "expected": DamerauOsa,
-        },
         "levenshtein": {
             "actual": EditDistance(DistanceAlgorithm.LEVENSHTEIN),
             "expected": Levenshtein,
+        },
+        "levenshtein_fast": {
+            "actual": EditDistance(DistanceAlgorithm.LEVENSHTEIN_FAST),
+            "expected": LevenshteinFast,
+        },
+        "damerau_osa": {
+            "actual": EditDistance(DistanceAlgorithm.DAMERAU_OSA),
+            "expected": DamerauOsa,
         },
         "damerau_osa_fast": {
             "actual": EditDistance(DistanceAlgorithm.DAMERAU_OSA_FAST),
             "expected": DamerauOsaFast,
         },
-        "levenshtein_fast": {
-            "actual": EditDistance(DistanceAlgorithm.LEVENSHTEIN_FAST),
-            "expected": LevenshteinFast,
+        "ukkonen": {
+            "actual": EditDistance(DistanceAlgorithm.UKKONEN),
+            "expected": Ukkonen,
         },
     }
     yield comparer_dict[request.param]["actual"], comparer_dict[request.param][
@@ -127,7 +141,7 @@ def get_short_and_long_strings():
 
 @pytest.fixture(params=[0, 1, 3, sys.maxsize])
 def get_strings(request):
-    alphabet = "abcd"
+    alphabet = "abcde"
     strings = [""]
     for i in range(1, len(alphabet) + 1):
         for combi in combinations(alphabet, i):

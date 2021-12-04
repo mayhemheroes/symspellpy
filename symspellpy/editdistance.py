@@ -31,9 +31,10 @@ class DistanceAlgorithm(Enum):
     """Supported edit distance algorithms."""
 
     LEVENSHTEIN = 0  #: Levenshtein algorithm.
-    DAMERAU_OSA = 1  #: Damerau optimal string alignment algorithm
-    LEVENSHTEIN_FAST = 2  #: Fast Levenshtein algorithm.
+    LEVENSHTEIN_FAST = 1  #: Fast Levenshtein algorithm.
+    DAMERAU_OSA = 2  #: Damerau optimal string alignment algorithm
     DAMERAU_OSA_FAST = 3  #: Fast Damerau optimal string alignment algorithm
+    UKKONEN = 4  #: Ukkonen's algorithm for approximate string matching
 
 
 class EditDistance:
@@ -58,12 +59,14 @@ class EditDistance:
         self._algorithm = algorithm
         if algorithm == DistanceAlgorithm.LEVENSHTEIN:
             self._distance_comparer = Levenshtein()
-        elif algorithm == DistanceAlgorithm.DAMERAU_OSA:
-            self._distance_comparer = DamerauOsa()
         elif algorithm == DistanceAlgorithm.LEVENSHTEIN_FAST:
             self._distance_comparer = LevenshteinFast()
+        elif algorithm == DistanceAlgorithm.DAMERAU_OSA:
+            self._distance_comparer = DamerauOsa()
         elif algorithm == DistanceAlgorithm.DAMERAU_OSA_FAST:
             self._distance_comparer = DamerauOsaFast()
+        elif algorithm == DistanceAlgorithm.UKKONEN:
+            self._distance_comparer = Ukkonen()
         else:
             raise ValueError("unknown distance algorithm")
 
@@ -425,6 +428,167 @@ class DamerauOsa(AbstractDistanceComparer):
             if char_1_costs[i + len_diff] > max_distance:
                 return -1
         return current_cost if current_cost <= max_distance else -1
+
+
+class Ukkonen(AbstractDistanceComparer):
+    """Ukkonen's algorithm for approximate string matching. This has been
+    modified to return -1 when the edit distance is larger than the specified
+    ``max_distance`` instead of just returning the ``max_distance`` to be
+    compatible with how it is used by SymSpell.
+
+    **From**: https://github.com/sunesimonsen/ukkonen
+    """
+
+    # pylint: disable=invalid-name
+
+    def distance(self, string_1: str, string_2: str, max_distance: int) -> int:
+        """Computes the edit distance between two strings using Ukkonen's
+        algorithm.
+
+        Args:
+            string_1: One of the strings to compare.
+            string_2: The other string to compare.
+            max_distance: The maximum distance that is of interest.
+
+        Returns:
+            -1 if the distance is greater than the max_distance, 0 if the strings
+                are equivalent, otherwise a positive number whose magnitude
+                increases as difference between the strings increases.
+        """
+        if string_1 is None or string_2 is None:
+            return helpers.null_distance_results(string_1, string_2, max_distance)
+        if max_distance <= 0:
+            return 0 if string_1 == string_2 else -1
+        max_distance = int(min(2 ** 31 - 1, max_distance))
+        # if strings of different lengths, ensure shorter string is in string_1.
+        # This can result in a little faster speed by spending more time spinning
+        # just the inner loop during the main processing.
+        if len(string_1) > len(string_2):
+            string_2, string_1 = string_1, string_2
+        if len(string_2) - len(string_1) > max_distance:
+            return -1
+        # identify common suffix and/or prefix that can be ignored
+        len_1, len_2, offset = helpers.prefix_suffix_prep(string_1, string_2)
+        if len_1 == 0:
+            return len_2 if len_2 <= max_distance else -1
+
+        if max_distance < len_2:
+            return self._distance_max(
+                string_1, string_2, len_1, len_2, offset, max_distance
+            )
+        return self._distance(string_1, string_2, len_1, len_2, offset)
+
+    @staticmethod
+    def _distance(string_1, string_2, len_1, len_2, offset):
+        """Internal implementation of calculating edit distance using Ukkonen's
+        algorithm when the length of the longer substring is shorter than the
+        specified ``max_distance``.
+        """
+        threshold = len_2
+        len_diff = len_2 - len_1
+
+        zero_k = min(threshold, len_1) // 2 + 2
+
+        array_len = len_diff + zero_k * 2 + 2
+        curr_row = [-1 for _ in range(array_len)]
+        next_row = [-1 for _ in range(array_len)]
+
+        i = 0
+        condition_row = len_diff + zero_k
+        stop_max = condition_row * 2
+
+        while i == 0 or (next_row[condition_row] < len_1 and i <= threshold):
+            i += 1
+
+            next_row, curr_row = curr_row, next_row
+
+            curr_cell = -1
+
+            if i <= zero_k:
+                start = -i + 1
+                next_cell = i - 2
+            else:
+                start = i - zero_k * 2 + 1
+                next_cell = curr_row[zero_k + start]
+
+            if i <= condition_row:
+                stop = i
+                next_row[zero_k + i] = -1
+            else:
+                stop = stop_max - i
+
+            row_idx = start + zero_k
+            for k in range(start, stop):
+                prev_cell = curr_cell
+                curr_cell = next_cell
+                next_cell = curr_row[row_idx + 1]
+                t = max(max(curr_cell + 1, prev_cell), next_cell + 1)
+                while (
+                    t < len_1
+                    and t + k < len_2
+                    and string_1[offset + t] == string_2[offset + t + k]
+                ):
+                    t += 1
+                next_row[row_idx] = t
+                row_idx += 1
+        return i - 1
+
+    @staticmethod
+    def _distance_max(string_1, string_2, len_1, len_2, offset, max_distance):
+        """Internal implementation of calculating edit distance using Ukkonen's
+        algorithm when the length of the longer substring is longer than the
+        specified ``max_distance``.
+        """
+        threshold = len_2
+        len_diff = len_2 - len_1
+
+        zero_k = min(threshold, len_1) // 2 + 2
+
+        array_len = len_diff + zero_k * 2 + 2
+        curr_row = [-1 for _ in range(array_len)]
+        next_row = [-1 for _ in range(array_len)]
+
+        i = 0
+        condition_row = len_diff + zero_k
+        stop_max = condition_row * 2
+
+        while i == 0 or (next_row[condition_row] < len_1 and i <= threshold):
+            i += 1
+            if i - 1 > max_distance:
+                return -1
+
+            next_row, curr_row = curr_row, next_row
+
+            curr_cell = -1
+
+            if i <= zero_k:
+                start = -i + 1
+                next_cell = i - 2
+            else:
+                start = i - zero_k * 2 + 1
+                next_cell = curr_row[zero_k + start]
+
+            if i <= condition_row:
+                stop = i
+                next_row[zero_k + i] = -1
+            else:
+                stop = stop_max - i
+
+            row_idx = start + zero_k
+            for k in range(start, stop):
+                prev_cell = curr_cell
+                curr_cell = next_cell
+                next_cell = curr_row[row_idx + 1]
+                t = max(max(curr_cell + 1, prev_cell), next_cell + 1)
+                while (
+                    t < len_1
+                    and t + k < len_2
+                    and string_1[offset + t] == string_2[offset + t + k]
+                ):
+                    t += 1
+                next_row[row_idx] = t
+                row_idx += 1
+        return i - 1
 
 
 class LevenshteinFast(AbstractDistanceComparer):
