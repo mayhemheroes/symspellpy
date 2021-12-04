@@ -1,19 +1,7 @@
 import sys
-from itertools import combinations, permutations
-
-import pytest
+from itertools import permutations
 
 from symspellpy.editdistance import Levenshtein, Ukkonen
-
-
-@pytest.fixture(params=[0, 1, 3, sys.maxsize])
-def get_strings(request):
-    alphabet = "abcd"
-    strings = [""]
-    for i in range(1, len(alphabet) + 1):
-        for combi in combinations(alphabet, i):
-            strings += ["".join(p) for p in permutations(combi)]
-    yield strings, request.param
 
 
 class TestUkkonen:
@@ -60,3 +48,12 @@ class TestUkkonen:
                 assert leven.distance(s1, s2, max_distance) == ukkonen.distance(
                     s1, s2, max_distance
                 )
+
+    def test_match_levenshtein_for_long_strings(self):
+        leven = Levenshtein()
+        ukkonen = Ukkonen()
+        alphabet = "abcdef"
+        long_strings = ["".join(permutation) for permutation in permutations(alphabet)]
+        for s1 in long_strings:
+            for s2 in long_strings:
+                assert leven.distance(s1, s2, 5) == ukkonen.distance(s1, s2, 5)

@@ -486,7 +486,6 @@ class Ukkonen(AbstractDistanceComparer):
         """
         threshold = len_2
         len_diff = len_2 - len_1
-
         zero_k = min(threshold, len_1) // 2 + 2
 
         array_len = len_diff + zero_k * 2 + 2
@@ -499,9 +498,7 @@ class Ukkonen(AbstractDistanceComparer):
 
         while i == 0 or (next_row[condition_row] < len_1 and i <= threshold):
             i += 1
-
             next_row, curr_row = curr_row, next_row
-
             curr_cell = -1
 
             if i <= zero_k:
@@ -541,7 +538,6 @@ class Ukkonen(AbstractDistanceComparer):
         """
         threshold = len_2
         len_diff = len_2 - len_1
-
         zero_k = min(threshold, len_1) // 2 + 2
 
         array_len = len_diff + zero_k * 2 + 2
@@ -551,14 +547,16 @@ class Ukkonen(AbstractDistanceComparer):
         i = 0
         condition_row = len_diff + zero_k
         stop_max = condition_row * 2
+        # print(
+        #     f"threshold: {threshold}, len_1: {len_1}, "
+        #     f"len_diff: {len_diff}, zero_k: {zero_k}, condition_row: {condition_row}"
+        # )
 
         while i == 0 or (next_row[condition_row] < len_1 and i <= threshold):
             i += 1
             if i - 1 > max_distance:
                 return -1
-
             next_row, curr_row = curr_row, next_row
-
             curr_cell = -1
 
             if i <= zero_k:
