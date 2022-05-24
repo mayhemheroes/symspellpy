@@ -1,0 +1,11 @@
+project: symspellpy
+target: symspellpy
+image: ghcr.io/ebell495/symspellpy:latest
+duration: 300
+
+tests:
+    - file:///no_tests
+
+cmds:
+    - cmd: fuzz/fuzz.py
+      libfuzzer: true
