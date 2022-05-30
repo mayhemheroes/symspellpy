@@ -1,10 +1,7 @@
 project: symspellpy
-target: symspellpy
-image: ghcr.io/ebell495/symspellpy:latest
-duration: 300
+target:  fuzz
 
-tests:
-    - file:///no_tests
+tests: null
 
 cmds:
     - cmd: fuzz/fuzz.py
