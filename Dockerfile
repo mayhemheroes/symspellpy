@@ -3,4 +3,4 @@ RUN pip3 install atheris
 
 COPY . /symspellpy
 WORKDIR /symspellpy
-RUN python3 -m pip install . && chmod +x fuzz/fuzz.py
+RUN python3 -m pip install . && chmod +x fuzz/fuzz_spellcheck.py
