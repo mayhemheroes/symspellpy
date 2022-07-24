@@ -1,6 +1,6 @@
 project: symspellpy
-target:  fuzz
+target: fuzz_spellcheck
 
 cmds:
-    - cmd: fuzz/fuzz.py
+    - cmd: fuzz/fuzz_spellcheck.py
       libfuzzer: true
