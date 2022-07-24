@@ -19,10 +19,8 @@ sym_spell.load_bigram_dictionary(bigram_path, term_index=0, count_index=2)
 
 @atheris.instrument_func
 def TestOneInput(data):
-    try:
-        input_term = data.decode("utf-8")
-    except UnicodeDecodeError:
-        return
+    fdp = atheris.FuzzedDataProvider(data)
+    input_term = fdp.ConsumeUnicodeNoSurrogates(len(data))
     
     sym_spell.lookup_compound(input_term, max_edit_distance=2)
 
